@@ -50,12 +50,68 @@ def compress( inputFile, outputFile ):
 
   startTime = time.time()
  
-  outputBytes = bytearray()
+  outputBytes = []
 
-  for y in range(img.shape[0]):
-    for x in range(img.shape[1]):
-      for c in range(img.shape[2]):
-        outputBytes.append( img[y,x,c] )
+  diff = []
+  dict = {}
+
+  s = ''
+
+  # it's a single-channel image
+  if len(img.shape) == 2:
+    for y in range(img.shape[0]):
+      for x in range(img.shape[1]):
+        # Predictive encoding
+        prediction = img[y-1, x] + 0.5*img[y, x-1] - 0.5*img[y-1, x-1]
+
+        diff.append(img[y,x] - prediction)
+
+  else: # it's a multi-channel image
+    for y in range(img.shape[0]):
+      for x in range(img.shape[1]):
+        for c in range(img.shape[2]):
+          # Predictive encoding
+          prediction = img[y - 1, x, c] + 0.5 * img[y, x - 1, c] - 0.5 * img[y - 1, x - 1, c]
+          diff.append(int(img[y, x, c]) - int(prediction))
+  unique_diff = list(set(diff))
+  # print(unique_diff)
+
+
+  # construct initial dictionary
+  v = 0
+  for i in unique_diff:
+    # if not dict.get(i):
+    dict[str(i)] = v
+    v += 1
+  # print("dict: ")
+  # print(dict)
+
+  # LZW encode the diff array
+  # while diff:
+  i = 0
+  for i in range(10):
+    if len(dict) > 65536:
+      print("TOO LONG")
+      break
+
+    x = str(diff.pop(0))
+    # print(x)
+    temp = s + x
+    if dict.get(temp):
+      s = temp
+      print('s is ' + s)
+    else:
+      index = dict.get(s)
+      if index:
+        print(index)
+        outputBytes.append(index)
+      s = x
+      dict[temp] = v
+      v += 1
+
+  # encode the last s
+  outputBytes.append(dict.get(s))
+  print(str(outputBytes))
 
   endTime = time.time()
 
@@ -64,10 +120,11 @@ def compress( inputFile, outputFile ):
   # Include the 'headerText' to identify the type of file.  Include
   # the rows, columns, channels so that the image shape can be
   # reconstructed.
+  headerText = 'header'
 
   outputFile.write( '%s\n'       % headerText )
   outputFile.write( '%d %d %d\n' % (img.shape[0], img.shape[1], img.shape[2]) )
-  outputFile.write( outputBytes )
+  outputFile.write( str(outputBytes) )
 
   # Print information about the compression
   
@@ -79,6 +136,7 @@ def compress( inputFile, outputFile ):
   sys.stderr.write( 'Compression factor: %.2f\n' % (inSize/float(outSize)) )
   sys.stderr.write( 'Compression time:   %.2f seconds\n' % (endTime - startTime) )
   
+
 
 
 # Uncompress an image
