@@ -88,7 +88,7 @@ def compress( inputFile, outputFile ):
 
   # LZW encode the diff array
   # while diff:
-  i = 0
+  # TODO: need to restrict the length of the dictionary. Doing 10 iteration for now
   for i in range(10):
     if len(dict) > 65536:
       print("TOO LONG")
