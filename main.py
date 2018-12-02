@@ -50,6 +50,7 @@ def compress( inputFile, outputFile ):
 
   startTime = time.time()
  
+  # outputBytes = bytearray()
   outputBytes = []
 
   diff = []
@@ -80,37 +81,45 @@ def compress( inputFile, outputFile ):
   # construct initial dictionary
   v = 0
   for i in unique_diff:
-    # if not dict.get(i):
     dict[str(i)] = v
     v += 1
   # print("dict: ")
-  # print(dict)
+  print(len(dict))
 
   # LZW encode the diff array
+  dict_list =[]
+  temp_dict = dict.copy()
+  dict_list.append(temp_dict)
+
   # while diff:
-  # TODO: need to restrict the length of the dictionary. Doing 10 iteration for now
-  for i in range(10):
-    if len(dict) > 65536:
+  for i in range(100):
+    if len(dict) >= 65536:
       print("TOO LONG")
-      break
+      dict_list.append(temp_dict)
+      temp_dict = {}
 
     x = str(diff.pop(0))
     # print(x)
     temp = s + x
-    if dict.get(temp):
+    d, index = search_all_dict(dict_list, temp)
+    if index != -1:
       s = temp
       print('s is ' + s)
     else:
-      index = dict.get(s)
-      if index:
+      # index = dict.get(s)
+      d, index = search_all_dict(dict_list, s)
+      if index != -1:
+        print("index is:")
         print(index)
         outputBytes.append(index)
-      s = x
-      dict[temp] = v
+      temp_dict[temp] = v
       v += 1
+      s = x
 
   # encode the last s
-  outputBytes.append(dict.get(s))
+  # outputBytes.append(dict.get(s))
+  d, index = search_all_dict(dict_list, s)
+  outputBytes.append(index)
   print(str(outputBytes))
 
   endTime = time.time()
@@ -137,6 +146,11 @@ def compress( inputFile, outputFile ):
   sys.stderr.write( 'Compression time:   %.2f seconds\n' % (endTime - startTime) )
   
 
+def search_all_dict(dict_list, key):
+  for d in dict_list:
+    if d.get(key):
+      return dict, d.get(key)
+  return -1, -1
 
 
 # Uncompress an image
