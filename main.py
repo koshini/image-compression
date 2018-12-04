@@ -73,6 +73,7 @@ def compress( inputFile, outputFile ):
           # Predictive encoding
           prediction = img[y - 1, x, c] + 0.5 * img[y, x - 1, c] - 0.5 * img[y - 1, x - 1, c]
           diff.append(int(img[y, x, c]) - int(prediction))
+
   unique_diff = list(set(diff))
   # print(unique_diff)
 
@@ -141,6 +142,7 @@ def compress( inputFile, outputFile ):
 
 # Uncompress an image
 
+
 def uncompress( inputFile, outputFile ):
 
   # Check that it's a known file
@@ -161,15 +163,46 @@ def uncompress( inputFile, outputFile ):
   #
   # REPLACE THIS WITH YOUR OWN CODE TO CONVERT THE 'inputBytes' ARRAY INTO AN IMAGE IN 'img'.
 
+
   startTime = time.time()
 
   img = np.empty( [rows,columns,channels], dtype=np.uint8 )
 
+  '''
   byteIter = iter(inputBytes)
   for y in range(rows):
     for x in range(columns):
       for c in range(channels):
         img[y,x,c] = byteIter.next()
+  '''
+
+  # construct initial dictionary
+  dict_size = 256
+  dictionary = dict((i, chr(i)) for i in xrange(dict_size))
+
+  # due to string concatenation in a loop
+  diff = []
+
+  bytes = iter(inputBytes)
+  s = bytes.next()
+  diff.append(s)
+
+  for i in len(inputBytes)-1:
+    temp = bytes.next()
+    if temp in dictionary:
+      t = dictionary[temp]
+    else:
+      t = s + s[0]
+    diff.append(t)
+    dictionary.append(s + t[0])
+    s = t
+
+  for i in diff:
+    for y in range(rows):
+      for x in range(columns):
+        for c in range(channels):
+          prediction = img[y - 1, x] + 0.5 * img[y, x - 1] - 0.5 * img[y - 1, x - 1]
+          img[y, x, c] = i + prediction
 
   endTime = time.time()
 
@@ -178,8 +211,6 @@ def uncompress( inputFile, outputFile ):
   netpbm.imsave( outputFile, img )
 
   sys.stderr.write( 'Uncompression time: %.2f seconds\n' % (endTime - startTime) )
-
-  
 
   
 # The command line is 
