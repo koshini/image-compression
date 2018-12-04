@@ -77,7 +77,7 @@ def compress( inputFile, outputFile ):
   unique_diff = list(set(diff))
   # print(unique_diff)
 
-
+  '''
   # construct initial dictionary
   v = 0
   for i in unique_diff:
@@ -86,12 +86,16 @@ def compress( inputFile, outputFile ):
     v += 1
   # print("dict: ")
   # print(dict)
+  '''
+  # construct initial dictionary
+  dict_size = 256
+  dictionary = {i : chr(i) for i in xrange(dict_size)}
 
   # LZW encode the diff array
   # while diff:
   # TODO: need to restrict the length of the dictionary. Doing 10 iteration for now
   for i in range(10):
-    if len(dict) > 65536:
+    if len(dictionary) > 65536:
       print("TOO LONG")
       break
 
@@ -102,16 +106,16 @@ def compress( inputFile, outputFile ):
       s = temp
       print('s is ' + s)
     else:
-      index = dict.get(s)
+      index = dictionary.get(s)
       if index:
         print(index)
         outputBytes.append(index)
       s = x
-      dict[temp] = v
-      v += 1
+      dictionary[temp] = dict_size
+      dict_size += 1
 
   # encode the last s
-  outputBytes.append(dict.get(s))
+  outputBytes.append(dictionary.get(s))
   print(str(outputBytes))
 
   endTime = time.time()
