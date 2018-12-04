@@ -182,7 +182,8 @@ def uncompress( inputFile, outputFile ):
 
   # construct initial dictionary
   dict_size = 256
-  dictionary = dict((i, chr(i)) for i in xrange(dict_size))
+  # python 2.7: dictionary = dict((i, chr(i)) for i in xrange(dict_size))
+  dictionary = {i: chr(i) for i in xrange(dict_size)}
 
   # due to string concatenation in a loop
   diff = []
