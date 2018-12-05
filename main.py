@@ -13,7 +13,7 @@
 
 import sys, os, math, time, netpbm
 import numpy as np
-
+import struct
 
 # Text at the beginning of the compressed file, to identify it
 
@@ -50,73 +50,57 @@ def compress( inputFile, outputFile ):
 
   startTime = time.time()
  
-  outputBytes = []
+  # outputBytes = []
+  outputBytes = bytearray()
 
   diff = []
-  dict = {}
-
-  s = ''
 
   # it's a single-channel image
   if len(img.shape) == 2:
     for y in range(img.shape[0]):
       for x in range(img.shape[1]):
         # Predictive encoding
-        prediction = img[y-1, x] + 0.5*img[y, x-1] - 0.5*img[y-1, x-1]
-
-        diff.append(img[y,x] - prediction)
+          prediction = int(img[y - 1, x]) + (int(img[y, x - 1]) - int(img[y - 1, x - 1]))/2
+          diff.append(int(img[y, x]) - int(prediction))
 
   else: # it's a multi-channel image
+
     for y in range(img.shape[0]):
       for x in range(img.shape[1]):
         for c in range(img.shape[2]):
           # Predictive encoding
-          prediction = img[y - 1, x, c] + 0.5 * img[y, x - 1, c] - 0.5 * img[y - 1, x - 1, c]
+          prediction = int(img[y - 1, x, c]) + (int(img[y, x - 1, c]) - int(img[y - 1, x - 1, c]))/2
           diff.append(int(img[y, x, c]) - int(prediction))
-
-  unique_diff = list(set(diff))
-  # print(unique_diff)
-
-  '''
+              
   # construct initial dictionary
-  v = 0
-  for i in unique_diff:
-    # if not dict.get(i):
-    dict[str(i)] = v
-    v += 1
-  # print("dict: ")
-  # print(dict)
-  '''
-  # construct initial dictionary
-  dict_size = 256
-  dictionary = {i : chr(i) for i in xrange(dict_size)}
-
+  dict_size = 255
+  dictionary = {struct.pack("h", i) : i+255 for i in xrange(-dict_size, dict_size)}
+  
   # LZW encode the diff array
   # while diff:
-  # TODO: need to restrict the length of the dictionary. Doing 10 iteration for now
+  s = ''
   for i in range(10):
-    if len(dictionary) > 65536:
-      print("TOO LONG")
-      break
-
-    x = str(diff.pop(0))
-    # print(x)
+ 
+    x = struct.pack('h', diff[i])
     temp = s + x
-    if dict.get(temp):
+    if temp in dictionary:
       s = temp
-      print('s is ' + s)
     else:
-      index = dictionary.get(s)
-      if index:
-        print(index)
-        outputBytes.append(index)
-      s = x
-      dictionary[temp] = dict_size
-      dict_size += 1
+      s_in = dictionary[s]
+      s1= s_in >> 8
+      s2= s_in & 255
+      outputBytes.append(s1)
+      outputBytes.append(s2)
+      if len(dictionary) < 65536:
+        dictionary[temp] = dict_size
+        dict_size += 1
 
   # encode the last s
-  outputBytes.append(dictionary.get(s))
-  print(str(outputBytes))
+  s_in = dictionary[s]
+  s1= s_in >> 8
+  s2= s_in & 255
+  outputBytes.append(s1)
+  outputBytes.append(s2)
 
   endTime = time.time()
 
