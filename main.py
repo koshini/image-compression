@@ -13,13 +13,7 @@
 
 import sys, os, math, time, netpbm
 import numpy as np
-
-
-# Text at the beginning of the compressed file, to identify it
-
-
-headerText = 'my compressed image - v1.0'
-
+import struct
 
 
 # Compress an image
@@ -50,69 +44,58 @@ def compress( inputFile, outputFile ):
 
   startTime = time.time()
  
-  outputBytes = []
+  # outputBytes = []
+  outputBytes = bytearray()
 
   diff = []
-  dict = {}
-
-  s = ''
 
   # it's a single-channel image
   if len(img.shape) == 2:
     for y in range(img.shape[0]):
       for x in range(img.shape[1]):
         # Predictive encoding
-        prediction = img[y-1, x] + 0.5*img[y, x-1] - 0.5*img[y-1, x-1]
-
-        diff.append(img[y,x] - prediction)
+          prediction = int(img[y - 1, x]) + (int(img[y, x - 1]) - int(img[y - 1, x - 1]))/2
+          diff.append(int(img[y, x]) - int(prediction))
 
   else: # it's a multi-channel image
+
     for y in range(img.shape[0]):
       for x in range(img.shape[1]):
         for c in range(img.shape[2]):
           # Predictive encoding
-          prediction = img[y - 1, x, c] + 0.5 * img[y, x - 1, c] - 0.5 * img[y - 1, x - 1, c]
+          prediction = int(img[y - 1, x, c]) + (int(img[y, x - 1, c]) - int(img[y - 1, x - 1, c]))/2
           diff.append(int(img[y, x, c]) - int(prediction))
-
-  unique_diff = list(set(diff))
-  # print(unique_diff)
-
-
+              
   # construct initial dictionary
-  v = 0
-  for i in unique_diff:
-    # if not dict.get(i):
-    dict[str(i)] = v
-    v += 1
-  # print("dict: ")
-  # print(dict)
-
+  dict_size = 256
+  dictionary = {struct.pack("h", i) : i+256 for i in xrange(-dict_size, dict_size)}
+  
   # LZW encode the diff array
   # while diff:
-  # TODO: need to restrict the length of the dictionary. Doing 10 iteration for now
-  for i in range(10):
-    if len(dict) > 65536:
-      print("TOO LONG")
-      break
-
-    x = str(diff.pop(0))
-    # print(x)
+  s = ''
+  for i in range(len(diff)):
+ 
+    x = struct.pack('h', diff[i])
     temp = s + x
-    if dict.get(temp):
+    if temp in dictionary:
       s = temp
-      print('s is ' + s)
     else:
-      index = dict.get(s)
-      if index:
-        print(index)
-        outputBytes.append(index)
+      s_in = dictionary[s]
+      s1= s_in >> 8
+      s2= s_in & 255
+      outputBytes.append(s1)
+      outputBytes.append(s2)
+      if len(dictionary) < 65536:
+        dictionary[temp] = dict_size
+        dict_size += 1
       s = x
-      dict[temp] = v
-      v += 1
 
   # encode the last s
-  outputBytes.append(dict.get(s))
-  print(str(outputBytes))
+  s_in = dictionary[s]
+  s1= s_in >> 8
+  s2= s_in & 255
+  outputBytes.append(s1)
+  outputBytes.append(s2)
 
   endTime = time.time()
 
@@ -121,9 +104,9 @@ def compress( inputFile, outputFile ):
   # Include the 'headerText' to identify the type of file.  Include
   # the rows, columns, channels so that the image shape can be
   # reconstructed.
-  headerText = 'header'
+  headerText = 'a'
 
-  outputFile.write( '%s\n'       % headerText )
+  outputFile.write( headerText + '\n' )
   outputFile.write( '%d %d %d\n' % (img.shape[0], img.shape[1], img.shape[2]) )
   outputFile.write( str(outputBytes) )
 
@@ -146,21 +129,19 @@ def compress( inputFile, outputFile ):
 def uncompress( inputFile, outputFile ):
 
   # Check that it's a known file
+  headerText = 'a'
 
   if inputFile.readline() != headerText + '\n':
     sys.stderr.write( "Input is not in the '%s' format.\n" % headerText )
     sys.exit(1)
     
   # Read the rows, columns, and channels.  
-
   rows, columns, channels = [ int(x) for x in inputFile.readline().split() ]
 
   # Read the raw bytes.
-
   inputBytes = bytearray(inputFile.read())
 
   # Build the image
-  #
   # REPLACE THIS WITH YOUR OWN CODE TO CONVERT THE 'inputBytes' ARRAY INTO AN IMAGE IN 'img'.
 
 
@@ -177,24 +158,29 @@ def uncompress( inputFile, outputFile ):
   '''
 
   # construct initial dictionary
-  dict_size = 256
-  dictionary = dict((i, chr(i)) for i in xrange(dict_size))
+  dict_size = 255
+  dictionary = {i+255 : struct.pack("h", i) for i in xrange(-dict_size, dict_size)}
 
   # due to string concatenation in a loop
   diff = []
 
-  bytes = iter(inputBytes)
-  s = bytes.next()
-  diff.append(s)
+  byte = iter(inputBytes)
+  s1 = byte.next()
+  s = dictionary[s1 << 8]
+  
+  diff.append(struct.unpack('h', s))
 
-  for i in len(inputBytes)-1:
-    temp = bytes.next()
+  for i in xrange(len(inputBytes)):
+    temp1 = byte.next().next()
+    temp = temp1 << 8
     if temp in dictionary:
       t = dictionary[temp]
     else:
       t = s + s[0]
-    diff.append(t)
-    dictionary.append(s + t[0])
+    diff.append(struct.unpack('h', t))
+    if len(dictionary) < 65536:
+      dictionary[dict_size] = s + t[0]
+      dict_size += 1
     s = t
 
   for i in diff:
