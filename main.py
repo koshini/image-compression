@@ -15,12 +15,6 @@ import sys, os, math, time, netpbm
 import numpy as np
 import struct
 
-# Text at the beginning of the compressed file, to identify it
-
-
-headerText = 'my compressed image - v1.0'
-
-
 
 # Compress an image
 
@@ -79,7 +73,7 @@ def compress( inputFile, outputFile ):
   # LZW encode the diff array
   # while diff:
   s = ''
-  for i in range(10):
+  for i in range(len(diff)):
  
     x = struct.pack('h', diff[i])
     temp = s + x
@@ -109,9 +103,9 @@ def compress( inputFile, outputFile ):
   # Include the 'headerText' to identify the type of file.  Include
   # the rows, columns, channels so that the image shape can be
   # reconstructed.
-  headerText = 'header'
+  headerText = 'a'
 
-  outputFile.write( '%s\n'       % headerText )
+  outputFile.write( headerText + '\n' )
   outputFile.write( '%d %d %d\n' % (img.shape[0], img.shape[1], img.shape[2]) )
   outputFile.write( str(outputBytes) )
 
@@ -134,21 +128,19 @@ def compress( inputFile, outputFile ):
 def uncompress( inputFile, outputFile ):
 
   # Check that it's a known file
+  headerText = 'a'
 
   if inputFile.readline() != headerText + '\n':
     sys.stderr.write( "Input is not in the '%s' format.\n" % headerText )
     sys.exit(1)
     
   # Read the rows, columns, and channels.  
-
   rows, columns, channels = [ int(x) for x in inputFile.readline().split() ]
 
   # Read the raw bytes.
-
   inputBytes = bytearray(inputFile.read())
 
   # Build the image
-  #
   # REPLACE THIS WITH YOUR OWN CODE TO CONVERT THE 'inputBytes' ARRAY INTO AN IMAGE IN 'img'.
 
 
@@ -165,25 +157,29 @@ def uncompress( inputFile, outputFile ):
   '''
 
   # construct initial dictionary
-  dict_size = 256
-  # python 2.7: dictionary = dict((i, chr(i)) for i in xrange(dict_size))
-  dictionary = {i: chr(i) for i in xrange(dict_size)}
+  dict_size = 255
+  dictionary = {i+255 : struct.pack("h", i) for i in xrange(-dict_size, dict_size)}
 
   # due to string concatenation in a loop
   diff = []
 
-  bytes = iter(inputBytes)
-  s = bytes.next()
-  diff.append(s)
+  byte = iter(inputBytes)
+  s1 = byte.next()
+  s = dictionary[s1 << 8]
+  
+  diff.append(struct.unpack('h', s))
 
-  for i in len(inputBytes)-1:
-    temp = bytes.next()
+  for i in xrange(len(inputBytes)):
+    temp1 = byte.next().next()
+    temp = temp1 << 8
     if temp in dictionary:
       t = dictionary[temp]
     else:
       t = s + s[0]
-    diff.append(t)
-    dictionary.append(s + t[0])
+    diff.append(struct.unpack('h', t))
+    if len(dictionary) < 65536:
+      dictionary[dict_size] = s + t[0]
+      dict_size += 1
     s = t
 
   for i in diff:
