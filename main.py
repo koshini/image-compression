@@ -67,8 +67,8 @@ def compress( inputFile, outputFile ):
           diff.append(int(img[y, x, c]) - int(prediction))
               
   # construct initial dictionary
-  dict_size = 255
-  dictionary = {struct.pack("h", i) : i+255 for i in xrange(-dict_size, dict_size)}
+  dict_size = 256
+  dictionary = {struct.pack("h", i) : i+256 for i in xrange(-dict_size, dict_size)}
   
   # LZW encode the diff array
   # while diff:
@@ -88,6 +88,7 @@ def compress( inputFile, outputFile ):
       if len(dictionary) < 65536:
         dictionary[temp] = dict_size
         dict_size += 1
+      s = x
 
   # encode the last s
   s_in = dictionary[s]
