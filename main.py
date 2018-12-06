@@ -15,6 +15,7 @@ import sys, os, math, time, netpbm
 import numpy as np
 import struct
 
+headerText = 'my compressed image - v1.0'
 
 # Compress an image
 
@@ -65,13 +66,13 @@ def compress( inputFile, outputFile ):
           # Predictive encoding
           prediction = int(img[y - 1, x, c]) + (int(img[y, x - 1, c]) - int(img[y - 1, x - 1, c]))/2
           diff.append(int(img[y, x, c]) - int(prediction))
-              
+
+  # print(diff)
   # construct initial dictionary
   dict_size = 256
   dictionary = {struct.pack("h", i) : i+256 for i in xrange(-dict_size, dict_size)}
   
   # LZW encode the diff array
-  # while diff:
   s = ''
   for i in range(len(diff)):
  
@@ -96,6 +97,7 @@ def compress( inputFile, outputFile ):
   s2= s_in & 255
   outputBytes.append(s1)
   outputBytes.append(s2)
+  # print(dictionary)
 
   endTime = time.time()
 
@@ -104,9 +106,8 @@ def compress( inputFile, outputFile ):
   # Include the 'headerText' to identify the type of file.  Include
   # the rows, columns, channels so that the image shape can be
   # reconstructed.
-  headerText = 'a'
 
-  outputFile.write( headerText + '\n' )
+  outputFile.write('%s\n' % headerText)
   outputFile.write( '%d %d %d\n' % (img.shape[0], img.shape[1], img.shape[2]) )
   outputFile.write( str(outputBytes) )
 
@@ -129,7 +130,6 @@ def compress( inputFile, outputFile ):
 def uncompress( inputFile, outputFile ):
 
   # Check that it's a known file
-  headerText = 'a'
 
   if inputFile.readline() != headerText + '\n':
     sys.stderr.write( "Input is not in the '%s' format.\n" % headerText )
@@ -160,21 +160,28 @@ def uncompress( inputFile, outputFile ):
   # construct initial dictionary
   dict_size = 255
   dictionary = {i+255 : struct.pack("h", i) for i in xrange(-dict_size, dict_size)}
+  print(dictionary)
+
 
   # due to string concatenation in a loop
   diff = []
 
   byte = iter(inputBytes)
-  s1 = byte.next()
-  s = dictionary[s1 << 8]
-  
-  diff.append(struct.unpack('h', s))
+  # read two bytes from the bytearray and take the sum, this gives you the original key
+  a = byte.next()
+  b = byte.next()
+  index = a + b # an integer
+
+  s = dictionary[index] # a string like 'csfbcx00'
+
+  diff.append(struct.unpack('h', s)) # this should be pack instead of unpack??????
 
   for i in xrange(len(inputBytes)):
-    temp1 = byte.next().next()
-    temp = temp1 << 8
-    if temp in dictionary:
-      t = dictionary[temp]
+    a = byte.next()
+    b = byte.next()
+    index = a + b  # an integer
+    if index in dictionary:
+      t = dictionary[index]
     else:
       t = s + s[0]
     diff.append(struct.unpack('h', t))
@@ -183,7 +190,7 @@ def uncompress( inputFile, outputFile ):
       dict_size += 1
     s = t
 
-  for i in diff:
+  for i in diff: # maybe here you need to use unpack?
     for y in range(rows):
       for x in range(columns):
         for c in range(channels):
