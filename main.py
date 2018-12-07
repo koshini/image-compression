@@ -158,44 +158,50 @@ def uncompress( inputFile, outputFile ):
   '''
 
   # construct initial dictionary
-  dict_size = 255
-  dictionary = {i+255 : struct.pack("h", i) for i in xrange(-dict_size, dict_size)}
-  print(dictionary)
-
+  dict_size = 256
+  dictionary = {i+256 : struct.pack("h", i) for i in xrange(-dict_size, dict_size)}
 
   # due to string concatenation in a loop
   diff = []
 
   byte = iter(inputBytes)
+  
+  # LZW uncompression
   # read two bytes from the bytearray and take the sum, this gives you the original key
   a = byte.next()
   b = byte.next()
   index = a + b # an integer
-
-  s = dictionary[index] # a string like 'csfbcx00'
-
-  diff.append(struct.unpack('h', s)) # this should be pack instead of unpack??????
-
-  for i in xrange(len(inputBytes)):
+  s = dictionary[index] 
+  diff.append(struct.unpack("h", s)[0])
+  
+  for i in xrange(len(inputBytes)/2-1):
     a = byte.next()
     b = byte.next()
     index = a + b  # an integer
     if index in dictionary:
       t = dictionary[index]
     else:
-      t = s + s[0]
-    diff.append(struct.unpack('h', t))
+      stemp = struct.unpack('h',s)[0]
+      t = s + struct.pack("h", stemp)
+    diff.append(struct.unpack("h", t)[0])
     if len(dictionary) < 65536:
-      dictionary[dict_size] = s + t[0]
+      ttemp = struct.unpack('h',t)[0]
+      dictionary[dict_size+257] = s + struct.pack("h", ttemp)
       dict_size += 1
     s = t
+    
+  diffs = iter(diff)
+  for y in range(rows):
+    for x in range(columns):
+      for c in range(channels):
+        if i< len(diff):
+          prediction = int(img[y - 1, x, c]) + (int(img[y, x - 1, c]) - int(img[y - 1, x - 1, c]))/2
+          img[y, x, c] = diffs.next() + prediction
+        i += 1
 
-  for i in diff: # maybe here you need to use unpack?
-    for y in range(rows):
-      for x in range(columns):
-        for c in range(channels):
-          prediction = img[y - 1, x] + 0.5 * img[y, x - 1] - 0.5 * img[y - 1, x - 1]
-          img[y, x, c] = i + prediction
+  sys.stdout.write( "Inputbyte length:" + str(len(inputBytes)/2-1 ))
+  sys.stdout.write( "Diff: " + str(len(diff)))
+
 
   endTime = time.time()
 
